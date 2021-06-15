@@ -5,6 +5,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/panjf2000/ants/v2"
 )
 
 // Cron keeps track of any number of entries, invoking the associated func as
@@ -24,6 +26,7 @@ type Cron struct {
 	parser    ScheduleParser
 	nextID    EntryID
 	jobWaiter sync.WaitGroup
+	p         *ants.Pool
 }
 
 // ScheduleParser is an interface for schedule spec parsers that return a Schedule
@@ -124,6 +127,8 @@ func New(opts ...Option) *Cron {
 		location:  time.Local,
 		parser:    standardParser,
 	}
+	c.p, _ = ants.NewPool(8000)
+
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -304,13 +309,13 @@ func (c *Cron) run() {
 	}
 }
 
-// startJob runs the given job in a new goroutine.
+// startJob runs the given job use a goroutine of pool.
 func (c *Cron) startJob(j Job) {
 	c.jobWaiter.Add(1)
-	go func() {
+	c.p.Submit(func() {
 		defer c.jobWaiter.Done()
 		j.Run()
-	}()
+	})
 }
 
 // now returns current time in c location
@@ -327,6 +332,10 @@ func (c *Cron) Stop() context.Context {
 		c.stop <- struct{}{}
 		c.running = false
 	}
+
+	// release the goroutine pool
+	c.p.Release()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		c.jobWaiter.Wait()
