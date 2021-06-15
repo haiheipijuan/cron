@@ -127,7 +127,7 @@ func New(opts ...Option) *Cron {
 		location:  time.Local,
 		parser:    standardParser,
 	}
-	c.p, _ = ants.NewPool(4096)
+	c.p, _ = ants.NewPool(1024)
 
 	for _, opt := range opts {
 		opt(c)
