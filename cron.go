@@ -130,7 +130,6 @@ func New(opts ...Option) *Cron {
 
 	c.pool, _ = ants.NewPool(1024,
 		ants.WithPreAlloc(true),
-		ants.WithNonblocking(true),
 		ants.WithMaxBlockingTasks(100),
 		ants.WithExpiryDuration(10*time.Second))
 
