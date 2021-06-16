@@ -26,7 +26,7 @@ type Cron struct {
 	parser    ScheduleParser
 	nextID    EntryID
 	jobWaiter sync.WaitGroup
-	p         *ants.Pool
+	pool      *ants.Pool
 }
 
 // ScheduleParser is an interface for schedule spec parsers that return a Schedule
@@ -127,7 +127,10 @@ func New(opts ...Option) *Cron {
 		location:  time.Local,
 		parser:    standardParser,
 	}
-	c.p, _ = ants.NewPool(1024)
+
+	c.pool, _ = ants.NewPool(1024,
+		ants.WithPreAlloc(true),
+		ants.WithNonblocking(true))
 
 	for _, opt := range opts {
 		opt(c)
@@ -312,7 +315,7 @@ func (c *Cron) run() {
 // startJob runs the given job use a goroutine of pool.
 func (c *Cron) startJob(j Job) {
 	c.jobWaiter.Add(1)
-	c.p.Submit(func() {
+	c.pool.Submit(func() {
 		defer c.jobWaiter.Done()
 		j.Run()
 	})
@@ -334,7 +337,7 @@ func (c *Cron) Stop() context.Context {
 	}
 
 	// release the goroutine pool
-	c.p.Release()
+	c.pool.Release()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
